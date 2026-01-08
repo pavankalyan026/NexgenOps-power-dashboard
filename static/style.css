@@ -1,0 +1,236 @@
+/* RESET */
+*{
+box-sizing:border-box;
+font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+/* BODY */
+body{
+margin:0;
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:#fff;
+}
+
+/* NAVBAR */
+.navbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:14px 20px;
+background:#081a1f;
+box-shadow:0 4px 12px rgba(0,0,0,.4);
+flex-wrap:wrap;
+}
+
+.brand-name{
+font-size:20px;
+font-weight:700;
+color:#00ffd5;
+}
+
+.brand-tagline{
+font-size:12px;
+color:#9ff3ea;
+}
+
+.nav-links{
+display:flex;
+gap:18px;
+flex-wrap:wrap;
+}
+
+.nav-links a{
+color:#00ffd5;
+text-decoration:none;
+font-weight:600;
+font-size:14px;
+}
+
+/* PAGE */
+.page{
+padding:24px;
+max-width:1200px;
+margin:auto;
+}
+
+/* DASHBOARD */
+.dashboard-header{
+margin-bottom:20px;
+}
+
+.dashboard-header h1{
+margin:0;
+font-size:26px;
+}
+
+.dashboard-header p{
+opacity:.85;
+margin-top:6px;
+}
+
+/* DASHBOARD GRID */
+.dashboard-grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+gap:20px;
+}
+
+/* DASHBOARD CARD */
+.dashboard-card{
+background:rgba(255,255,255,0.15);
+border-radius:16px;
+padding:20px;
+text-decoration:none;
+color:#fff;
+box-shadow:0 10px 25px rgba(0,0,0,.35);
+transition:.25s;
+}
+
+.dashboard-card:hover{
+transform:translateY(-6px);
+background:rgba(255,255,255,0.22);
+}
+
+.dashboard-card .icon{
+font-size:28px;
+margin-bottom:8px;
+}
+
+.dashboard-card h3{
+margin:8px 0 6px;
+color:#00ffd5;
+}
+
+/* CARD (FOR OTHER PAGES) */
+.card{
+background:rgba(255,255,255,.14);
+padding:22px;
+border-radius:16px;
+box-shadow:0 12px 30px rgba(0,0,0,.4);
+max-width:520px;
+margin:auto;
+}
+
+.card.wide{
+max-width:1000px;
+}
+
+/* TABLE */
+table{
+width:100%;
+background:#fff;
+color:#000;
+border-radius:12px;
+border-collapse:collapse;
+overflow:hidden;
+}
+
+th{
+background:#0f2027;
+color:#fff;
+padding:12px;
+}
+
+td{
+padding:10px;
+text-align:center;
+border-bottom:1px solid #ddd;
+}
+
+tr:hover{
+background:#f2f2f2;
+}
+
+/* FORM */
+label{
+display:block;
+margin-top:12px;
+font-size:14px;
+}
+
+input,select{
+width:100%;
+padding:12px;
+margin-top:6px;
+border-radius:8px;
+border:none;
+}
+
+input.readonly{
+background:#e0e0e0;
+color:#000;
+font-weight:bold;
+}
+
+button{
+margin-top:20px;
+width:100%;
+padding:12px;
+border:none;
+border-radius:10px;
+background:#00ffd5;
+font-weight:bold;
+font-size:16px;
+}
+/* KPI GRID */
+.kpi-grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+gap:16px;
+margin-bottom:26px;
+}
+
+.kpi-card{
+background:rgba(255,255,255,0.18);
+border-radius:16px;
+padding:18px;
+text-align:center;
+box-shadow:0 10px 25px rgba(0,0,0,.35);
+}
+
+.kpi-icon{
+font-size:26px;
+}
+
+.kpi-value{
+font-size:26px;
+font-weight:700;
+margin-top:6px;
+color:#00ffd5;
+}
+
+.kpi-label{
+font-size:13px;
+opacity:.85;
+margin-top:4px;
+}
+canvas{
+background:#fff;
+border-radius:12px;
+padding:10px;
+}
+.kpi-card.alert{
+border:2px solid #ff4d4d;
+background:rgba(255,77,77,0.2);
+}
+.btn-ack{
+background:#ffc107;
+padding:6px 10px;
+border-radius:6px;
+color:#000;
+text-decoration:none;
+font-weight:600;
+}
+
+.btn-close{
+background:#28a745;
+padding:6px 10px;
+border-radius:6px;
+color:#fff;
+text-decoration:none;
+font-weight:600;
+}
+
+.alert-box{
+border:2px solid #ff4d4d;
+}
