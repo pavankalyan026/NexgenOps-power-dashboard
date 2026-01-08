@@ -1,3 +1,4 @@
+from io import BytesIO
 import json
 import sqlite3
 import os
@@ -287,24 +288,41 @@ def meter_detail(meter_id):
 # ---------- EXPORT PER METER ----------
 @app.route("/export/meter/<meter_id>")
 def export_meter(meter_id):
-    with db() as d:
-        df = pd.read_sql(
-            "SELECT date, opening, closing, consumption, entered_by, employee_id "
-            "FROM readings WHERE meter_id=? ORDER BY date",
-            d, params=(meter_id,)
-        )
-    file_path = f"{meter_id}_history.xlsx"
-    df.to_excel(file_path, index=False)
-    return send_file(file_path, as_attachment=True)
+    df = pd.read_sql(
+        "SELECT date, opening, closing, consumption, entered_by, employee_id "
+        "FROM readings WHERE meter_id=? ORDER BY date",
+        db(),
+        params=(meter_id,)
+    )
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=meter_id)
+
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"{meter_id}_history.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # ---------- EXPORT ALL ----------
 @app.route("/export_all")
 def export_all():
-    with db() as d:
-        df = pd.read_sql("SELECT * FROM readings", d)
-    file_path = "all_meter_readings.xlsx"
-    df.to_excel(file_path, index=False)
-    return send_file(file_path, as_attachment=True)
+    df = pd.read_sql("SELECT * FROM readings", db())
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="All_Readings")
+
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="all_meter_readings.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 # ---------- ACKNOWLEDGE ALERT ----------
 @app.route("/alert/ack/<int:alert_id>")
 def acknowledge_alert(alert_id):
