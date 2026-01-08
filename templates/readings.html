@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card wide">
+<h2>All Readings</h2>
+
+<a href="/export_all">📤 Export All</a>
+
+<table>
+<tr>
+<th>Date</th><th>Meter</th><th>Opening</th>
+<th>Closing</th><th>Consumption</th>
+</tr>
+{% for r in rows %}
+<tr>
+<td>{{r[2]}}</td>
+<td>{{r[1]}}</td>
+<td>{{r[3]}}</td>
+<td>{{r[4]}}</td>
+<td>{{r[5]}}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

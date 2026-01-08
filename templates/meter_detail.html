@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card wide">
+<h2>Meter : {{meter[1]}}</h2>
+
+<p>
+<b>Load:</b> {{meter[2]}} |
+<b>Location:</b> {{meter[3]}} |
+<b>Unit:</b> {{meter[4]}}
+</p>
+
+{% if alerts %}
+<div class="card wide alert-box">
+<h3>🚨 Active Alerts</h3>
+
+<table>
+<tr>
+<th>Date</th>
+<th>Consumption</th>
+<th>Average</th>
+<th>Deviation %</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+
+{% for a in alerts %}
+<tr>
+<td>{{a[2]}}</td>
+<td>{{a[3]}}</td>
+<td>{{a[4]}}</td>
+<td>{{a[5]}}%</td>
+<td>{{a[6]}}</td>
+<td>
+  {% if a[6] == 'OPEN' %}
+    <a href="/alert/ack/{{a[0]}}" class="btn-ack">Acknowledge</a>
+  {% elif a[6] == 'ACKNOWLEDGED' %}
+    <a href="/alert/close/{{a[0]}}" class="btn-close">Close</a>
+  {% else %}
+    Closed
+  {% endif %}
+</td>
+</tr>
+{% endfor %}
+</table>
+
+</div>
+{% endif %}
+
+<a href="/export/meter/{{meter[1]}}">📤 Export This Meter</a>
+
+<table>
+<tr>
+<th>Date</th><th>Opening</th><th>Closing</th>
+<th>Consumption</th><th>Image</th>
+</tr>
+
+{% for r in readings %}
+<tr>
+<td>{{r[2]}}</td>
+<td>{{r[3]}}</td>
+<td>{{r[4]}}</td>
+<td>{{r[5]}}</td>
+<td>
+{% if r[8] %}
+<a href="/static/uploads/{{r[8]}}" target="_blank">
+<img src="/static/uploads/{{r[8]}}" width="50">
+</a>
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

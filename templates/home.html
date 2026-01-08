@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="dashboard-header">
+  <h1>Power Operations Dashboard</h1>
+  <p>NexgenOps – Smart Power. Accurate Decisions.</p>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-card alert">
+  <span class="kpi-icon">🚨</span>
+  <div class="kpi-value">{{ open_alerts }}</div>
+  <div class="kpi-label">Active Alerts</div>
+</div>
+<div class="kpi-grid">
+
+  <div class="kpi-card">
+    <span class="kpi-icon">⚡</span>
+    <div class="kpi-value">{{ total_meters }}</div>
+    <div class="kpi-label">Total Meters</div>
+  </div>
+
+  <div class="kpi-card">
+    <span class="kpi-icon">📊</span>
+    <div class="kpi-value">{{ today_consumption }}</div>
+    <div class="kpi-label">Today Consumption</div>
+  </div>
+
+  <div class="kpi-card">
+    <span class="kpi-icon">📅</span>
+    <div class="kpi-value">{{ month_consumption }}</div>
+    <div class="kpi-label">This Month</div>
+  </div>
+
+  <div class="kpi-card">
+    <span class="kpi-icon">🧾</span>
+    <div class="kpi-value">{{ total_readings }}</div>
+    <div class="kpi-label">Total Readings</div>
+  </div>
+
+</div>
+{% if recent_alerts %}
+<div class="card wide">
+<h2>🚨 Active Alerts</h2>
+
+<table>
+<tr>
+<th>Meter</th>
+<th>Date</th>
+<th>Deviation %</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+
+{% for a in recent_alerts %}
+<tr>
+<td>{{a[1]}}</td>
+<td>{{a[2]}}</td>
+<td>{{a[5]}}%</td>
+<td>{{a[6]}}</td>
+<td>
+  {% if a[6] == 'OPEN' %}
+    <a href="/alert/ack/{{a[0]}}" class="btn-ack">Acknowledge</a>
+  {% elif a[6] == 'ACKNOWLEDGED' %}
+    <a href="/alert/close/{{a[0]}}" class="btn-close">Close</a>
+  {% endif %}
+</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endif %}
+
+<!-- GRAPHS -->
+<div class="card wide">
+  <h2>Consumption Analytics</h2>
+
+  <canvas id="dailyChart" height="200"></canvas>
+  <br>
+  <canvas id="monthlyChart" height="200"></canvas>
+</div>
+
+<!-- CHART JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const dailyCtx = document.getElementById('dailyChart');
+new Chart(dailyCtx, {
+  type: 'line',
+  data: {
+    labels: {{ daily_labels|safe }},
+    datasets: [{
+      label: 'Daily Consumption',
+      data: {{ daily_values|safe }},
+      borderWidth: 2,
+      fill: true
+    }]
+  }
+});
+
+const monthCtx = document.getElementById('monthlyChart');
+new Chart(monthCtx, {
+  type: 'bar',
+  data: {
+    labels: {{ month_labels|safe }},
+    datasets: [{
+      label: 'Monthly Consumption',
+      data: {{ month_values|safe }},
+      borderWidth: 1
+    }]
+  }
+});
+</script>
+
+<!-- ACTION CARDS -->
+<div class="dashboard-grid">
+
+  <a href="/meters" class="dashboard-card">
+    <div class="icon">⚡</div>
+    <h3>Meter Management</h3>
+    <p>View and manage all meters.</p>
+  </a>
+
+  <a href="/add_reading" class="dashboard-card">
+    <div class="icon">📊</div>
+    <h3>Consumption Tracking</h3>
+    <p>Add readings and track consumption.</p>
+  </a>
+
+  <a href="/readings" class="dashboard-card">
+    <div class="icon">📸</div>
+    <h3>Audit Proof</h3>
+    <p>Verify readings with images.</p>
+  </a>
+
+  <a href="/readings" class="dashboard-card">
+    <div class="icon">📤</div>
+    <h3>Reports & Export</h3>
+    <p>Export meter-wise or full data.</p>
+  </a>
+
+</div>
+
+{% endblock %}

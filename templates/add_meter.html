@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>Add Meter</h2>
+
+  <form method="post">
+
+    <label>Meter ID</label>
+    <input type="text" name="meter_id" placeholder="Enter Meter ID" required>
+
+    <label>Load Type</label>
+    <input type="text" name="load_type" placeholder="LT / HT / DG">
+
+    <label>Location</label>
+    <input type="text" name="location" placeholder="Building / Panel / Floor">
+
+    <label>Unit</label>
+    <select name="unit">
+      <option value="KWH">KWH</option>
+      <option value="MWH">MWH</option>
+    </select>
+
+    <button type="submit">Add Meter</button>
+
+  </form>
+</div>
+
+{% endblock %}

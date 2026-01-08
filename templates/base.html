@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NexgenOps | Smart Power. Accurate Decisions.</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="brand">
+    <div class="brand-name">NexgenOps</div>
+    <div class="brand-tagline">Smart Power. Accurate Decisions.</div>
+  </div>
+
+  <nav class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/add_meter">Add Meter</a>
+    <a href="/meters">View Meters</a>
+    <a href="/add_reading">Add Reading</a>
+    <a href="/readings">Reports</a>
+  </nav>
+</header>
+
+<main class="page">
+  {% block content %}{% endblock %}
+</main>
+
+</body>
+</html>

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>Add Power Reading</h2>
+
+  <form method="post" enctype="multipart/form-data">
+
+    <label>Meter</label>
+    <select id="meter" name="meter_id" onchange="fetchOpening()" required>
+      <option value="">Select Meter</option>
+      {% for m in meters %}
+        <option value="{{m[0]}}">{{m[0]}}</option>
+      {% endfor %}
+    </select>
+
+    <label>Opening Reading (Auto)</label>
+    <input id="opening" name="opening" class="readonly" readonly>
+
+    <label>Closing Reading</label>
+    <input type="number" step="0.0001" name="closing" required>
+
+    <!-- 📸 CAMERA -->
+    <label>Capture Meter Image</label>
+    <input
+      type="file"
+      name="image"
+      accept="image/*"
+      capture="environment"
+      required
+    >
+
+    <label>Entered By</label>
+    <input type="text" name="entered_by">
+
+    <label>Employee ID</label>
+    <input type="text" name="employee_id">
+
+    <button type="submit">Save Reading</button>
+
+  </form>
+</div>
+
+<script>
+function fetchOpening(){
+  const meter = document.getElementById("meter").value;
+  if(!meter) return;
+
+  fetch("/get_opening/" + meter)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("opening").value = data.opening;
+    });
+}
+</script>
+
+{% endblock %}

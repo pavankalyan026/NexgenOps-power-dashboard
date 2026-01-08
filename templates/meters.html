@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card wide">
+<h2>Meter Master</h2>
+
+<table>
+<tr>
+<th>Meter</th><th>Load</th><th>Location</th><th>Unit</th>
+</tr>
+{% for m in meters %}
+<tr onclick="location.href='/meter/{{m[1]}}'">
+<td>{{m[1]}}</td>
+<td>{{m[2]}}</td>
+<td>{{m[3]}}</td>
+<td>{{m[4]}}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}
