@@ -1,76 +1,47 @@
-from flask import Flask, render_template, request, redirect, session, jsonify, send_file
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from datetime import datetime
-from io import BytesIO
-import sqlite3
-import pandas as pd
-import os
 import json
+import sqlite3
+import os
+import pandas as pd
+from flask import Flask, render_template, request, redirect, jsonify, send_file
+from datetime import datetime
+from werkzeug.utils import secure_filename
 
-# =========================================================
-# APP CONFIG
-# =========================================================
 app = Flask(__name__)
-app.secret_key = "power-dashboard-secret"
 
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+# ---------- DATABASE ----------
 DB_PATH = "power.db"
 
-# =========================================================
-# DATABASE
-# =========================================================
 def db():
+    # Use check_same_thread=False for SQLite in Flask
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
-# =========================================================
-# INIT DATABASE (ONCE)
-# =========================================================
 def init_db():
     with db() as d:
-        cur = d.cursor()
-
-        # ---------- COMPANIES ----------
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS pd_companies (
+        d.execute("""
+        CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_code TEXT UNIQUE,
-            company_name TEXT,
-            status TEXT
-        )
-        """)
-
-        # ---------- USERS ----------
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS pd_users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER,
-            username TEXT,
-            password TEXT,
-            role TEXT
-        )
-        """)
-
-        # ---------- METERS ----------
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS meters (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER,
             meter_id TEXT,
+            date TEXT,
+            consumption REAL,
+            average REAL,
+            percentage REAL,
+            status TEXT
+        )""")
+        d.execute("""
+        CREATE TABLE IF NOT EXISTS meters(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            meter_id TEXT UNIQUE,
             load_type TEXT,
             location TEXT,
             unit TEXT
-        )
-        """)
-
-        # ---------- READINGS ----------
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS readings (
+        )""")
+        d.execute("""
+        CREATE TABLE IF NOT EXISTS readings(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER,
             meter_id TEXT,
             date TEXT,
             opening REAL,
@@ -79,136 +50,178 @@ def init_db():
             entered_by TEXT,
             employee_id TEXT,
             image TEXT
-        )
-        """)
-
-        # ---------- ALERTS ----------
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER,
-            meter_id TEXT,
-            date TEXT,
-            consumption REAL,
-            average REAL,
-            percentage REAL,
-            status TEXT
-        )
-        """)
-
+        )""")
         d.commit()
 
 init_db()
 
-# =========================================================
-# LOGIN
-# =========================================================
-@app.route("/", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        company_code = request.form["company_code"]
-        username = request.form["username"]
-        password = request.form["password"]
+def check_abnormal(meter_id):
+    d = db()
+    try:
+        # Last reading
+        last = d.execute("""
+            SELECT consumption FROM readings
+            WHERE meter_id=?
+            ORDER BY id DESC LIMIT 1
+        """, (meter_id,)).fetchone()
 
-        with db() as d:
-            cur = d.cursor()
-            cur.execute("""
-                SELECT u.id, u.password, u.role, c.id, c.status, c.company_name
-                FROM pd_users u
-                JOIN pd_companies c ON u.company_id = c.id
-                WHERE c.company_code=? AND u.username=?
-            """, (company_code, username))
-            row = cur.fetchone()
+        if not last: return
 
-        if not row:
-            return render_template("login.html", error="Invalid credentials")
+        today_val = last[0]
 
-        user_id, pw_hash, role, company_id, status, company_name = row
+        # Average of last 7 readings (excluding today)
+        avg_row = d.execute("""
+            SELECT AVG(consumption) FROM (
+                SELECT consumption FROM readings
+                WHERE meter_id=?
+                ORDER BY id DESC LIMIT 7 OFFSET 1
+            )
+        """, (meter_id,)).fetchone()
 
-        if status != "ACTIVE":
-            return render_template("login.html", error="Company suspended")
+        avg = avg_row[0] if avg_row and avg_row[0] is not None else 0
 
-        if not check_password_hash(pw_hash, password):
-            return render_template("login.html", error="Wrong password")
+        if avg <= 0: return
 
-        session["pd_user"] = user_id
-        session["pd_role"] = role
-        session["pd_company_id"] = company_id
-        session["pd_company_name"] = company_name
+        percent = ((today_val - avg) / avg) * 100
 
-        return redirect("/dashboard")
-
-    return render_template("login.html")
-
-# =========================================================
-# DASHBOARD
-# =========================================================
-@app.route("/dashboard")
-def dashboard():
-    if not session.get("pd_user"):
-        return redirect("/")
-
-    return render_template(
-        "dashboard.html",
-        role=session["pd_role"],
-        company=session["pd_company_name"]
-    )
-
-# =========================================================
-# ADD METER
-# =========================================================
-@app.route("/add_meter", methods=["GET", "POST"])
-def add_meter():
-    if not session.get("pd_company_id"):
-        return redirect("/")
-
-    if request.method == "POST":
-        with db() as d:
+        if percent >= 30:   # Threshold
             d.execute("""
-                INSERT INTO meters
-                (company_id, meter_id, load_type, location, unit)
-                VALUES (?,?,?,?,?)
+                INSERT INTO alerts
+                (meter_id, date, consumption, average, percentage, status)
+                VALUES (?,?,?,?,?,?)
             """, (
-                session["pd_company_id"],
+                meter_id,
+                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                today_val,
+                round(avg, 2),
+                round(percent, 2),
+                "OPEN"
+            ))
+            d.commit()
+    finally:
+        d.close()
+
+# ---------- HOME ----------
+@app.route("/")
+def home():
+    d = db()
+    recent_alerts = d.execute("""
+    SELECT * FROM alerts
+    WHERE status!='CLOSED'
+    ORDER BY id DESC LIMIT 5
+""").fetchall()
+    try:
+        # Get count of open alerts first
+        open_alerts = d.execute(
+            "SELECT COUNT(*) FROM alerts WHERE status='OPEN'"
+        ).fetchone()[0]
+
+        # KPI DATA
+        total_meters = d.execute("SELECT COUNT(*) FROM meters").fetchone()[0]
+        total_readings = d.execute("SELECT COUNT(*) FROM readings").fetchone()[0]
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        month = datetime.now().strftime("%Y-%m")
+
+        today_consumption = d.execute(
+            "SELECT IFNULL(SUM(consumption),0) FROM readings WHERE date LIKE ?",
+            (today+"%",)
+        ).fetchone()[0]
+
+        month_consumption = d.execute(
+            "SELECT IFNULL(SUM(consumption),0) FROM readings WHERE date LIKE ?",
+            (month+"%",)
+        ).fetchone()[0]
+
+        # DAILY GRAPH (LAST 7 DAYS)
+        daily = d.execute("""
+            SELECT SUBSTR(date,1,10), SUM(consumption)
+            FROM readings
+            GROUP BY SUBSTR(date,1,10)
+            ORDER BY SUBSTR(date,1,10) DESC
+            LIMIT 7
+        """).fetchall()
+
+        daily.reverse()
+        daily_labels = [r[0] for r in daily]
+        daily_values = [round(r[1], 2) for r in daily]
+
+        # MONTHLY GRAPH
+        monthly = d.execute("""
+            SELECT SUBSTR(date,1,7), SUM(consumption)
+            FROM readings
+            WHERE date LIKE ?
+            GROUP BY SUBSTR(date,1,7)
+        """, (month+"%",)).fetchall()
+
+        month_labels = [r[0] for r in monthly]
+        month_values = [round(r[1], 2) for r in monthly]
+
+        return render_template(
+            "home.html",
+            open_alerts=open_alerts,
+            total_meters=total_meters,
+            total_readings=total_readings,
+            today_consumption=round(today_consumption, 2),
+            month_consumption=round(month_consumption, 2),
+            daily_labels=json.dumps(daily_labels),
+            daily_values=json.dumps(daily_values),
+            month_labels=json.dumps(month_labels),
+            month_values=json.dumps(month_values)
+        )
+    finally:
+        d.close()
+
+# ---------- ADD METER ----------
+@app.route("/add_meter", methods=["GET","POST"])
+def add_meter():
+    if request.method == "POST":
+        d = db()
+        try:
+            d.execute("""
+            INSERT INTO meters (meter_id, load_type, location, unit)
+            VALUES (?,?,?,?)
+            """, (
                 request.form["meter_id"],
                 request.form["load_type"],
                 request.form["location"],
                 request.form["unit"]
             ))
             d.commit()
+        finally:
+            d.close()
         return redirect("/meters")
-
     return render_template("add_meter.html")
 
-# =========================================================
-# METERS LIST
-# =========================================================
+# ---------- METER LIST ----------
 @app.route("/meters")
 def meters():
-    if not session.get("pd_company_id"):
-        return redirect("/")
-
-    with db() as d:
-        rows = d.execute("""
-            SELECT * FROM meters
-            WHERE company_id=?
-        """, (session["pd_company_id"],)).fetchall()
-
+    d = db()
+    try:
+        rows = d.execute("SELECT * FROM meters").fetchall()
+    finally:
+        d.close()
     return render_template("meters.html", meters=rows)
 
-# =========================================================
-# ADD READING
-# =========================================================
-@app.route("/add_reading", methods=["GET", "POST"])
-def add_reading():
-    if not session.get("pd_company_id"):
-        return redirect("/")
+# ---------- FETCH OPENING ----------
+@app.route("/get_opening/<meter_id>")
+def get_opening(meter_id):
+    d = db()
+    try:
+        last = d.execute(
+            "SELECT closing FROM readings WHERE meter_id=? ORDER BY id DESC LIMIT 1",
+            (meter_id,)
+        ).fetchone()
+    finally:
+        d.close()
+    return jsonify({"opening": last[0] if last else 0})
 
-    with db() as d:
-        meters_list = d.execute("""
-            SELECT meter_id FROM meters
-            WHERE company_id=?
-        """, (session["pd_company_id"],)).fetchall()
+# ---------- ADD READING ----------
+@app.route("/add_reading", methods=["GET","POST"])
+def add_reading():
+    d = db()
+    try:
+        meters_list = d.execute("SELECT meter_id FROM meters").fetchall()
 
         if request.method == "POST":
             opening = float(request.form["opening"])
@@ -218,19 +231,16 @@ def add_reading():
             image = None
             f = request.files.get("image")
             if f and f.filename:
+                # Use secure_filename properly
                 ext = os.path.splitext(f.filename)[1]
-                image = secure_filename(
-                    f"{request.form['meter_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
-                )
+                image = secure_filename(f"{request.form['meter_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}")
                 f.save(os.path.join(app.config["UPLOAD_FOLDER"], image))
 
             d.execute("""
-                INSERT INTO readings
-                (company_id, meter_id, date, opening, closing, consumption,
-                 entered_by, employee_id, image)
-                VALUES (?,?,?,?,?,?,?,?,?)
+            INSERT INTO readings
+            (meter_id,date,opening,closing,consumption,entered_by,employee_id,image)
+            VALUES (?,?,?,?,?,?,?,?)
             """, (
-                session["pd_company_id"],
                 request.form["meter_id"],
                 datetime.now().strftime("%Y-%m-%d %H:%M"),
                 opening, closing, consumption,
@@ -239,59 +249,95 @@ def add_reading():
                 image
             ))
             d.commit()
-
+            check_abnormal(request.form["meter_id"])
             return redirect("/readings")
+    finally:
+        d.close()
 
     return render_template("add_reading.html", meters=meters_list)
 
-# =========================================================
-# READINGS
-# =========================================================
+# ---------- ALL READINGS ----------
 @app.route("/readings")
 def readings():
-    if not session.get("pd_company_id"):
-        return redirect("/")
-
-    with db() as d:
-        rows = d.execute("""
-            SELECT * FROM readings
-            WHERE company_id=?
-            ORDER BY date DESC
-        """, (session["pd_company_id"],)).fetchall()
-
+    d = db()
+    try:
+        rows = d.execute("SELECT * FROM readings ORDER BY date DESC").fetchall()
+    finally:
+        d.close()
     return render_template("readings.html", rows=rows)
 
-# =========================================================
-# EXPORT ALL
-# =========================================================
+# ---------- METER DETAIL ----------
+@app.route("/meter/<meter_id>")
+def meter_detail(meter_id):
+    d = db()
+    try:
+        alerts = d.execute("""
+            SELECT * FROM alerts
+            WHERE meter_id=? AND status='OPEN'
+        """, (meter_id,)).fetchall()
+        meter = d.execute("SELECT * FROM meters WHERE meter_id=?", (meter_id,)).fetchone()
+        readings_list = d.execute(
+            "SELECT * FROM readings WHERE meter_id=? ORDER BY date DESC",
+            (meter_id,)
+        ).fetchall()
+    finally:
+        d.close()
+    return render_template("meter_detail.html", meter=meter, readings=readings_list, alerts=alerts)
+
+# ---------- EXPORT PER METER ----------
+@app.route("/export/meter/<meter_id>")
+def export_meter(meter_id):
+    with db() as d:
+        df = pd.read_sql(
+            "SELECT date, opening, closing, consumption, entered_by, employee_id "
+            "FROM readings WHERE meter_id=? ORDER BY date",
+            d, params=(meter_id,)
+        )
+    file_path = f"{meter_id}_history.xlsx"
+    df.to_excel(file_path, index=False)
+    return send_file(file_path, as_attachment=True)
+
+# ---------- EXPORT ALL ----------
 @app.route("/export_all")
 def export_all():
-    if not session.get("pd_company_id"):
-        return redirect("/")
+    with db() as d:
+        df = pd.read_sql("SELECT * FROM readings", d)
+    file_path = "all_meter_readings.xlsx"
+    df.to_excel(file_path, index=False)
+    return send_file(file_path, as_attachment=True)
+# ---------- ACKNOWLEDGE ALERT ----------
+@app.route("/alert/ack/<int:alert_id>")
+def acknowledge_alert(alert_id):
+    d = db()
+    d.execute("""
+        UPDATE alerts
+        SET status='ACKNOWLEDGED',
+            acknowledged_by='Operator',
+            acknowledged_at=?
+        WHERE id=?
+    """, (
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        alert_id
+    ))
+    d.commit()
+    return redirect(request.referrer or "/")
 
-    df = pd.read_sql("""
-        SELECT * FROM readings
-        WHERE company_id=?
-    """, db(), params=(session["pd_company_id"],))
+# ---------- CLOSE ALERT ----------
+@app.route("/alert/close/<int:alert_id>")
+def close_alert(alert_id):
+    d = db()
+    d.execute("""
+        UPDATE alerts
+        SET status='CLOSED',
+            closed_by='Operator',
+            closed_at=?
+        WHERE id=?
+    """, (
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        alert_id
+    ))
+    d.commit()
+    return redirect(request.referrer or "/")    
 
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False)
-
-    output.seek(0)
-    return send_file(output, as_attachment=True,
-                     download_name="meter_readings.xlsx")
-
-# =========================================================
-# LOGOUT
-# =========================================================
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/")
-
-# =========================================================
-# RUN
-# =========================================================
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
